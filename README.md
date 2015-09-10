@@ -1,4 +1,5 @@
-# multi-compile
+# multi-compile [![Build Status](https://travis-ci.org/ffevotte/multi-compile.svg)](https://travis-ci.org/ffevotte/multi-compile) [![Coverage Status](https://coveralls.io/repos/ffevotte/multi-compile/badge.svg?branch=master&service=github)](https://coveralls.io/github/ffevotte/multi-compile?branch=master)
+
 
 `multi-compile` is an Emacs extension allowing to easily work with several
 independant compilation commands. Instead of the traditional `compile` and
