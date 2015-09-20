@@ -1,4 +1,5 @@
-# multi-compile [![Build Status](https://travis-ci.org/ffevotte/multi-compile.svg)](https://travis-ci.org/ffevotte/multi-compile) [![Coverage Status](https://coveralls.io/repos/ffevotte/multi-compile/badge.svg?branch=master&service=github)](https://coveralls.io/github/ffevotte/multi-compile?branch=master)
+# multi-compile
+[![Build-status](https://travis-ci.org/ffevotte/multi-compile.svg)](https://travis-ci.org/ffevotte/multi-compile) [![Coverage-status](https://coveralls.io/repos/ffevotte/multi-compile/badge.svg?branch=master&service=github)](https://coveralls.io/github/ffevotte/multi-compile?branch=master) [![Tag](https://img.shields.io/github/tag/ffevotte/multi-compile.svg)](https://github.com/ffevotte/multi-compile/tags) [![License](https://img.shields.io/badge/license-GPL_v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0.html)
 
 
 `multi-compile` is an Emacs extension allowing to easily work with several
@@ -67,3 +68,20 @@ A C++ developer might setup the following commands to automate the development p
 (global-set-key (kbd "<f7>") (multi-compile install    :command "make install"))
 (global-set-key (kbd "<f8>") (multi-compile build-doc  :command "make doc"))
 ```
+
+## Contributing
+
+If you make improvements to this code or have suggestions, please do not hesitate to fork the repository or submit bug reports on [github](https://github.com/ffevotte/multi-compile). The repository's URL is:
+
+    https://github.com/ffevotte/multi-compile.git
+
+
+## License
+
+Copyright (C) 2014-2015 François Févotte.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
