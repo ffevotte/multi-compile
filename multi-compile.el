@@ -58,7 +58,7 @@
 (eval-and-compile
   (require 'hydra))
 
-(defvar multi-compile-dwim-method nil
+(defvar multi-compile-dwim-method 'hydra
   "Method used for the menu of possible actions in the
   multi-compile DWIM command.
 
