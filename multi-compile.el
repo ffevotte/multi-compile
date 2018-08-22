@@ -58,6 +58,15 @@
 (eval-and-compile
   (require 'hydra))
 
+(defvar multi-compile-dwim-method nil
+  "Method used for the menu of possible actions in the
+  multi-compile DWIM command.
+
+Available methods are:
+- hydra
+- helm
+")
+
 (defmacro multi-compile (name &rest args)
   "Define a new compilation command.
 
@@ -81,96 +90,146 @@ Optional arguments ARGS are composed of a plist with the following keys:
     Define a default shell command associated to the newly
     created `compile' command.
 "
-  (let* ((key              (plist-get args :key))
+  (let* (;; Optional arguments
+         (key              (plist-get args :key))
          (default-command  (plist-get args :command))
+
+         ;; Identification of the various buffers and commands
          (buffer-name      (format "*%s*" name))
          (compile-symbol   name)
          (recompile-symbol (intern (format "re%s" name)))
          (dwim-symbol      (intern (format "%s-dwim" name)))
-         (hydra-symbol     (intern (format "%s-hydra" name)))
+         (menu-symbol      (intern (format "%s-menu" name)))
+
+         ;; A LET-form which will enclose the compile and recompile bodies
+         ;; allows to override standard compilation-related variables with
+         ;; customized ones
          (let-form `((compilation-buffer-name-function
-                      (lambda (mode) "" ,buffer-name)))))
+                      (lambda (mode) "" ,buffer-name))))
+
+         (generated-code   nil)
+
+         ;; Menu actions
+         (menu-recompile   `(let ((current-prefix-arg nil))
+                              (call-interactively #',recompile-symbol)))
+         (menu-interactive `(let ((current-prefix-arg '(4)))
+                              (call-interactively #',compile-symbol)))
+         (menu-reset       `(let ((current-prefix-arg nil))
+                              (call-interactively #',compile-symbol)))
+         (menu-change-cmd  `(let ((current-prefix-arg '(4)))
+                              (call-interactively #',recompile-symbol)))
+         (menu-change-dir  `(with-current-buffer (get-buffer ,buffer-name)
+                              (setq current-prefix-arg nil
+                                    compilation-directory
+                                    (read-directory-name "Compile in directory:"
+                                                         compilation-directory))
+                              (call-interactively #',recompile-symbol)))
+         )
     (when (fboundp compile-symbol)
-      (warn "redefining command `%s'" name))
+      (warn "redefining command `%s'" compile-symbol))
     (when (fboundp recompile-symbol)
-      (warn "redefining command `re%s'" name))
+      (warn "redefining command `%s'" recompile-symbol))
     (when (not (null default-command))
       (push `(compile-command ,default-command) let-form))
-    `(prog1
-         (defun ,dwim-symbol (argp)
-           ,(format
-             "This command behaves similary to `%s', with alternatives.
+    (push `(defun ,compile-symbol ()
+             ,(format
+               "This command behaves similarly to `compile', except it puts compilation
+    results in the %s buffer." buffer-name)
+             (interactive)
+             (let ,let-form
+               (call-interactively #'compile)))
+          generated-code)
 
-When called without argument, call `%s'.
+    (push `(defun ,recompile-symbol ()
+             ,(format
+               "This command behaves similarly to `recompile', except it reuses the
+    last compilation parameters from buffer %s." buffer-name)
+             (interactive)
+             (if (get-buffer ,buffer-name)
+                 (with-current-buffer ,buffer-name
+                   (let ,let-form
+                     (call-interactively #'recompile)))
+               (call-interactively #',compile-symbol)))
+          generated-code)
 
-Otherwise, when ARGP is non-nil, offer a choice between multiple
-compilation-related commands:
+    (push
+     (when multi-compile-dwim-method
+       (let ((dwim
+              `(defun ,dwim-symbol (argp)
+                 ,(format
+                   "This command behaves similary to `%s', with alternatives.
 
-- `%s' using the last compilation parameters;
+    When called without argument, call `%s'.
 
-- run an interactive `%s' compilation (uses Comint with
-  `compilation-shell-minor-mode');
+    Otherwise, when ARGP is non-nil, offer a choice between multiple
+    compilation-related commands:
 
-- re-run the `%s' compilation command, resetting directory and
-  command;
+    - `%s' using the last compilation parameters;
 
-- `%s', changing the compilation command;
+    - run an interactive `%s' compilation (uses Comint with
+      `compilation-shell-minor-mode');
 
-- `%s', changing the compilation directory."
-             recompile-symbol recompile-symbol recompile-symbol
-             compile-symbol   compile-symbol
-             recompile-symbol recompile-symbol)
-           (interactive "P")
-           (if (null argp)
-               (call-interactively #',recompile-symbol)
-             (call-interactively (get ',dwim-symbol :alternate-hydra))))
+    - re-run the `%s' compilation command, resetting directory and
+      command;
 
-       (defun ,compile-symbol ()
-         ,(format
-           "This command behaves similarly to `compile', except it puts compilation
-results in the %s buffer." buffer-name)
-         (interactive)
-         (let ,let-form
-           (call-interactively #'compile)))
+    - `%s', changing the compilation command;
 
-       (defun ,recompile-symbol ()
-         ,(format
-           "This command behaves similarly to `recompile', except it reuses the
-last compilation parameters from buffer %s." buffer-name)
-         (interactive)
-         (if (get-buffer ,buffer-name)
-             (with-current-buffer ,buffer-name
-               (let ,let-form
-                 (call-interactively #'recompile)))
-           (call-interactively #',compile-symbol)))
+    - `%s', changing the compilation directory."
+                   recompile-symbol recompile-symbol recompile-symbol
+                   compile-symbol   compile-symbol
+                   recompile-symbol recompile-symbol)
+                 (interactive "P")
+                 (if (null argp)
+                     (call-interactively #',recompile-symbol)
+                   (call-interactively (get ',dwim-symbol :menu)))))
 
-       (put ',dwim-symbol :alternate-hydra
-            (defhydra ,hydra-symbol (:exit t)
-              ,(format "
-%s:
-  _r_ecompile           recompile and change:
-  _i_nteractive           _c_ommand
-  _R_eset everything      _d_irectory
-" name)
-              ("r" (let ((current-prefix-arg nil))
-                     (call-interactively #',recompile-symbol))
-               nil)
-              ("i" (let ((current-prefix-arg '(4)))
-                     (call-interactively #',compile-symbol))
-               nil)
-              ("R" (let ((current-prefix-arg nil))
-                     (call-interactively #',compile-symbol))
-               nil)
-              ("c" (let ((current-prefix-arg '(4)))
-                     (call-interactively #',recompile-symbol))
-               nil)
-              ("d" (with-current-buffer (get-buffer ,buffer-name)
-                     (setq current-prefix-arg nil
-                           compilation-directory
-                           (read-directory-name "Compile in directory:"
-                                                compilation-directory))
-                     (call-interactively #',recompile-symbol))
-               nil))))))
+             (menu
+              (case multi-compile-dwim-method
+                ('hydra
+                 `(defhydra ,menu-symbol (:exit t)
+                    ,(concat "\n"
+                             (format "%s:\n" name)
+                             "  _r_ecompile           recompile and change:\n"
+                             "  _i_nteractive           _c_ommand\n"
+                             "  _R_eset everything      _d_irectory")
+                    ("r" ,menu-recompile   nil)
+                    ("i" ,menu-interactive nil)
+                    ("R" ,menu-reset       nil)
+                    ("c" ,menu-change-cmd  nil)
+                    ("d" ,menu-change-dir  nil)))
+                ('helm
+                 `(defun ,menu-symbol ()
+                    (interactive)
+                    (case
+                        (string-to-char (substring
+                                         (or (helm :sources (helm-build-sync-source ,(format "%s" name)
+                                                              :candidates '("(r) Recompile"
+                                                                            "(i) Switch to interactive mode"
+                                                                            "(R) Reset everything"
+                                                                            "(c) Recompile and change command"
+                                                                            "(d) Recompile and change directory")
+                                                              :fuzzy-match t)
+                                                   :buffer ,(format "*%s menu*" name))
+                                             "(?)")
+                                         1 2))
+                      (?r ,menu-recompile)
+                      (?i ,menu-interactive)
+                      (?R ,menu-reset)
+                      (?c ,menu-change-cmd)
+                      (?d ,menu-change-dir)
+                      (t  (message ,(format "%s: Unknown action" name))))))
+                (t
+                 (error (format
+                         "Incorrect value for `multi-compile-dwim-method': %s"
+                         multi-compile-dwim-method))))))
+         `(prog1
+              ,dwim
+            (put ',dwim-symbol :menu
+                 ,menu))
+         ))
+     generated-code)
+
+    (push 'prog1 generated-code)))
 
 (provide 'multi-compile)
 ;;; multi-compile.el ends here
